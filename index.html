@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Boys Hunts Mill Chart</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 10px; }
+    h2, h3 { text-align: center; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th, td { border: 1px solid #888; padding: 6px; text-align: center; }
+    textarea { width: 100%; height: 50px; resize: vertical; }
+    .btn { padding: 4px 10px; margin: 2px; cursor: pointer; font-size: 12px; }
+    .btn-save { background-color: #4CAF50; color: white; }
+    .btn-edit { background-color: #ffc107; color: black; }
+    .btn-delete { background-color: #f44336; color: white; }
+    .report-container { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 20px; }
+    select, input[type="month"] { padding: 5px; margin: 10px 5px; }
+  </style>
+</head>
+<body>
+  <h2>Boys Hunts Mill Chart</h2>
+  <label for="date">Select Date:</label>
+  <input type="date" id="date">
+
+  <table id="millTable">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Dupur</th>
+        <th>Raat</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+  <div class="report-container">
+    <h3>Individual User Report</h3>
+    <label for="userSelect">Select User:</label>
+    <select id="userSelect"></select>
+    <button onclick="generateUserReport()">Show Report</button>
+    <div id="userReport"></div>
+
+    <h3>Monthly Report</h3>
+    <label for="monthSelect">Select Month:</label>
+    <input type="month" id="monthSelect">
+    <button onclick="generateMonthlyReport()">Show Monthly Report</button>
+    <div id="monthlyReport"></div>
+  </div>
+
+  <script>
+    const users = ['Robi', 'Nadim', 'Hasan', 'Basir', 'Tanjil', 'Nuralam'];
+    const tableBody = document.getElementById('tableBody');
+    const dateInput = document.getElementById('date');
+    const userSelect = document.getElementById('userSelect');
+
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.value = today;
+
+    function loadData() {
+      tableBody.innerHTML = '';
+      const selectedDate = dateInput.value;
+      const saved = JSON.parse(localStorage.getItem("mill_posts")) || {};
+      const posts = saved[selectedDate] || {};
+
+      users.forEach(user => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${user}</td>
+          <td>
+            <textarea>${posts[user]?.dupur || ''}</textarea><br>
+            <button class="btn btn-save" onclick="save('${user}', 'dupur', this)">Save</button>
+            <button class="btn btn-delete" onclick="remove('${user}', 'dupur')">Delete</button>
+          </td>
+          <td>
+            <textarea>${posts[user]?.raat || ''}</textarea><br>
+            <button class="btn btn-save" onclick="save('${user}', 'raat', this)">Save</button>
+            <button class="btn btn-delete" onclick="remove('${user}', 'raat')">Delete</button>
+          </td>`;
+        tableBody.appendChild(row);
+      });
+    }
+
+    function save(user, shift, btn) {
+      const textarea = btn.parentElement.querySelector('textarea');
+      const content = textarea.value.trim();
+      const selectedDate = dateInput.value;
+      if (!content) return alert("Post cannot be empty!");
+
+      let saved = JSON.parse(localStorage.getItem("mill_posts")) || {};
+      saved[selectedDate] = saved[selectedDate] || {};
+      saved[selectedDate][user] = saved[selectedDate][user] || {};
+      saved[selectedDate][user][shift] = content;
+      localStorage.setItem("mill_posts", JSON.stringify(saved));
+      alert("Saved!");
+    }
+
+    function remove(user, shift) {
+      const selectedDate = dateInput.value;
+      let saved = JSON.parse(localStorage.getItem("mill_posts")) || {};
+      if (saved[selectedDate]?.[user]) {
+        delete saved[selectedDate][user][shift];
+        if (Object.keys(saved[selectedDate][user]).length === 0) delete saved[selectedDate][user];
+        localStorage.setItem("mill_posts", JSON.stringify(saved));
+        loadData();
+      }
+    }
+
+    function populateUserDropdown() {
+      userSelect.innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
+    }
+
+    function generateUserReport() {
+      const saved = JSON.parse(localStorage.getItem("mill_posts")) || {};
+      const user = userSelect.value;
+      let count = 0;
+      let html = `<table><tr><th>Date</th><th>Dupur</th><th>Raat</th></tr>`;
+      for (let date in saved) {
+        const data = saved[date][user];
+        if (data) {
+          if (data.dupur) count++;
+          if (data.raat) count++;
+          html += `<tr><td>${date}</td><td>${data.dupur || ''}</td><td>${data.raat || ''}</td></tr>`;
+        }
+      }
+      html += `<tr><td colspan="3" style="text-align:right;font-weight:bold;">Total Posts: ${count}</td></tr>`;
+      html += '</table>';
+      document.getElementById('userReport').innerHTML = html;
+    }
+
+    function generateMonthlyReport() {
+      const month = document.getElementById('monthSelect').value;
+      const saved = JSON.parse(localStorage.getItem("mill_posts")) || {};
+      let html = `<h2>Monthly Report: ${month}</h2><table border="1" style="width:100%;border-collapse:collapse;"><tr><th>Date</th>${users.map(u => `<th>${u} Dupur</th><th>${u} Raat</th>`).join('')}</tr>`;
+      
+      const userTotals = {};
+      users.forEach(u => userTotals[u] = 0);
+
+      for (let date in saved) {
+        if (date.startsWith(month)) {
+          html += `<tr><td>${date}</td>`;
+          users.forEach(user => {
+            const post = saved[date][user] || {};
+            const dupur = post.dupur || '';
+            const raat = post.raat || '';
+            if (dupur) userTotals[user]++;
+            if (raat) userTotals[user]++;
+            html += `<td>${dupur}</td><td>${raat}</td>`;
+          });
+          html += '</tr>';
+        }
+      }
+
+      html += `<tr><td><strong>Total</strong></td>`;
+      let subTotal = 0;
+      users.forEach(user => {
+        const total = userTotals[user];
+        subTotal += total;
+        html += `<td colspan="2"><strong>${total} Posts</strong></td>`;
+      });
+      html += `</tr>`;
+
+      html += `<tr><td colspan="${1 + users.length * 2}" style="text-align:right; font-weight:bold;">Sub Total (All Users): ${subTotal} Posts</td></tr>`;
+      
+      html += '</table>';
+
+      const newWindow = window.open('', '_blank');
+      newWindow.document.write(`
+        <html>
+          <head>
+            <title>Monthly Report - ${month}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              h2 { text-align: center; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { border: 1px solid #888; padding: 8px; text-align: center; }
+            </style>
+          </head>
+          <body>${html}</body>
+        </html>
+      `);
+      newWindow.document.close();
+    }
+
+    dateInput.addEventListener('change', loadData);
+    loadData();
+    populateUserDropdown();
+  </script>
+</body>
+</html>
